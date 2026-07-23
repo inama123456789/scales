@@ -10,6 +10,6 @@
  * protection only (visible in source) — see ilt/SETUP.md.
  */
 window.APP_CONFIG = {
-  ENDPOINT_URL: "PASTE_YOUR_ILT_APPS_SCRIPT_WEB_APP_URL_HERE",
-  SHARED_SECRET: "change-me",
+  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbwjcXIqOcKk-OmGY5JcCnJqFAP4demC0zPukJ9yTnteVveIQOPhQzdHzWPLsfzjBvt6/exec",
+  SHARED_SECRET: "information literacy boh podgornik",
 };
