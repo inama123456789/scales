@@ -12,6 +12,6 @@
  * threat model.
  */
 window.APP_CONFIG = {
-  ENDPOINT_URL: "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE",
-  SHARED_SECRET: "change-me",
+  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbzlH6nY05PEH3gt4uRfLcfBTXDi5Np7byfphbjsHyQH7rL8_8c4lkh5Sn6NrcWfNDp1/exec",
+  SHARED_SECRET: "Mede_scientific_literacy",
 };
