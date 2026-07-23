@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Science Literacy Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+  .wrap { max-width: 980px; }
+  .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .toolbar .spacer { flex: 1; }
+  button.secondary {
+    padding: 8px 14px; border-radius: 8px; border: 1px solid var(--gridline);
+    background: var(--surface-1); color: var(--text-primary); cursor: pointer; font-size: 0.85rem;
+  }
+  button.secondary:hover { border-color: var(--series-1); }
+  .stat-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat-tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 16px; min-width: 140px;
+  }
+  .stat-tile .label { font-size: 0.78rem; color: var(--text-secondary); }
+  .stat-tile .value { font-size: 1.6rem; font-weight: 600; margin-top: 2px; }
+  .legend { display: flex; gap: 18px; align-items: center; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-secondary); }
+  .legend .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .chart-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 20px; }
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .axis-label { fill: var(--text-muted); font-size: 11px; }
+  .value-label { fill: var(--text-primary); font-size: 11px; font-weight: 600; }
+  .gridline { stroke: var(--gridline); stroke-width: 1; }
+  .bar-group:hover rect { filter: brightness(1.08); }
+  .tooltip {
+    position: fixed; pointer-events: none; background: var(--text-primary); color: var(--page);
+    padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; opacity: 0; transition: opacity 0.1s;
+    z-index: 20; white-space: nowrap;
+  }
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.data-table th, table.data-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--gridline); }
+  table.data-table th { color: var(--text-secondary); font-weight: 600; font-size: 0.78rem; }
+  table.data-table td.num { font-variant-numeric: tabular-nums; }
+  .hidden { display: none; }
+  .empty-state { text-align: center; padding: 48px 16px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Science Literacy Dashboard</h1>
+  <p class="lede">Your class's responses compared with the published US population baseline (Study 2, Mede et al., 2025).</p>
+
+  <div class="toolbar">
+    <button class="secondary" id="refreshBtn">Refresh data</button>
+    <span class="muted" id="lastUpdated"></span>
+    <div class="spacer"></div>
+    <button class="secondary" id="toggleTableBtn">View as table</button>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script src="items.js"></script>
+<script src="scoring.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  const { ITEMS, DIMENSIONS, US_BASELINE } = window.SCALE;
+  const { aggregateClass } = window.SCORING;
+
+  const COLOR_CLASS = getComputedStyle(document.documentElement).getPropertyValue("--series-1").trim() || "#2a78d6";
+  const COLOR_US = getComputedStyle(document.documentElement).getPropertyValue("--series-2").trim() || "#eb6834";
+
+  let showTable = false;
+  let lastAgg = null;
+
+  document.getElementById("refreshBtn").addEventListener("click", load);
+  document.getElementById("toggleTableBtn").addEventListener("click", () => {
+    showTable = !showTable;
+    document.getElementById("toggleTableBtn").textContent = showTable ? "View as chart" : "View as table";
+    if (lastAgg) render(lastAgg);
+  });
+
+  load();
+
+  async function load() {
+    const content = document.getElementById("content");
+    if (!window.APP_CONFIG || window.APP_CONFIG.ENDPOINT_URL.indexOf("PASTE_YOUR") === 0) {
+      content.innerHTML = `<div class="empty-state">This dashboard isn't connected to a data endpoint yet. See config.js / SETUP.md.</div>`;
+      return;
+    }
+    try {
+      const url = window.APP_CONFIG.ENDPOINT_URL + "?secret=" + encodeURIComponent(window.APP_CONFIG.SHARED_SECRET);
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Request failed");
+      document.getElementById("lastUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
+      const agg = aggregateClass(ITEMS, data.respondents || []);
+      lastAgg = agg;
+      render(agg);
+    } catch (err) {
+      content.innerHTML = `<div class="empty-state">Could not load data: ${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  function render(agg) {
+    const content = document.getElementById("content");
+    if (!agg.n) {
+      content.innerHTML = `<div class="empty-state">No responses yet. Once participants submit the survey, results will appear here.</div>`;
+      return;
+    }
+    content.innerHTML = "";
+    content.appendChild(renderStatRow(agg));
+    content.appendChild(renderSubscaleSection(agg));
+    content.appendChild(renderItemSection(agg));
+  }
+
+  function renderStatRow(agg) {
+    const div = document.createElement("div");
+    div.className = "stat-row";
+    const tiles = [
+      { label: "Respondents", value: String(agg.n) },
+      { label: "Class full-scale score", value: fmtPct(agg.dimensionScores.full) },
+      { label: "US population score", value: fmtPct(US_BASELINE.full) },
+    ];
+    tiles.forEach((t) => {
+      const tile = document.createElement("div");
+      tile.className = "stat-tile";
+      tile.innerHTML = `<div class="label">${t.label}</div><div class="value">${t.value}</div>`;
+      div.appendChild(tile);
+    });
+    return div;
+  }
+
+  function renderSubscaleSection(agg) {
+    const section = document.createElement("div");
+    const rows = [
+      { label: "Full scale", key: "full" },
+      { label: "Civic literacy", key: "civic" },
+      { label: "Media literacy", key: "media" },
+      { label: "Cognitive literacy", key: "cognitive" },
+    ].map((r) => ({
+      label: r.label,
+      classVal: agg.dimensionScores[r.key],
+      usVal: US_BASELINE[r.key],
+    }));
+
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    const heading = document.createElement("h2");
+    heading.style.margin = "0 0 12px";
+    heading.style.color = "var(--text-primary)";
+    heading.style.fontSize = "1.05rem";
+    heading.textContent = "Class vs. US population, by dimension";
+    card.appendChild(heading);
+
+    if (showTable) {
+      card.appendChild(renderSubscaleTable(rows));
+    } else {
+      card.appendChild(renderLegend());
+      card.appendChild(renderGroupedBarChart(rows));
+    }
+    section.appendChild(card);
+    return section;
+  }
+
+  function renderLegend() {
+    const div = document.createElement("div");
+    div.className = "legend";
+    div.innerHTML = `
+      <span><span class="swatch" style="background:${COLOR_CLASS}"></span>Your class</span>
+      <span><span class="swatch" style="background:${COLOR_US}"></span>US population (published)</span>
+    `;
+    return div;
+  }
+
+  function renderSubscaleTable(rows) {
+    const table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML = `
+      <thead><tr><th>Dimension</th><th>Your class</th><th>US population</th><th>Difference</th></tr></thead>
+      <tbody>
+        ${rows.map((r) => `
+          <tr>
+            <td>${escapeHtml(r.label)}</td>
+            <td class="num">${fmtPct(r.classVal)}</td>
+            <td class="num">${fmtPct(r.usVal)}</td>
+            <td class="num">${fmtDiff(r.classVal, r.usVal)}</td>
+          </tr>
+        `).join("")}
+      </tbody>
+    `;
+    return table;
+  }
+
+  // Hand-rolled grouped bar chart (SVG), following the project's mark spec:
+  // bars capped at 24px thick, 4px rounded data-end / square baseline,
+  // 2px surface gap between adjacent bars, value labels at the tip,
+  // hairline gridlines, hover tooltip.
+  function renderGroupedBarChart(rows) {
+    const width = 900, height = 320;
+    const marginTop = 24, marginBottom = 36, marginLeft = 8, marginRight = 8;
+    const plotH = height - marginTop - marginBottom;
+    const groupW = (width - marginLeft - marginRight) / rows.length;
+    const barW = 24, gap = 2;
+
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("style", "max-width:100%;height:auto;display:block;");
+
+    // Gridlines at 0/25/50/75/100%
+    [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
+      const y = marginTop + plotH * (1 - t);
+      const line = document.createElementNS(svg.namespaceURI, "line");
+      line.setAttribute("x1", marginLeft);
+      line.setAttribute("x2", width - marginRight);
+      line.setAttribute("y1", y);
+      line.setAttribute("y2", y);
+      line.setAttribute("class", "gridline");
+      svg.appendChild(line);
+      const label = document.createElementNS(svg.namespaceURI, "text");
+      label.setAttribute("x", marginLeft);
+      label.setAttribute("y", y - 4);
+      label.setAttribute("class", "axis-label");
+      label.textContent = Math.round(t * 100) + "%";
+      svg.appendChild(label);
+    });
+
+    rows.forEach((row, i) => {
+      const groupCenter = marginLeft + groupW * i + groupW / 2;
+      const pairW = barW * 2 + gap;
+      const x0 = groupCenter - pairW / 2;
+
+      addBar(svg, x0, row.classVal, barW, plotH, marginTop, COLOR_CLASS, row.label + " — your class", row.classVal);
+      addBar(svg, x0 + barW + gap, row.usVal, barW, plotH, marginTop, COLOR_US, row.label + " — US population", row.usVal);
+
+      const catLabel = document.createElementNS(svg.namespaceURI, "text");
+      catLabel.setAttribute("x", groupCenter);
+      catLabel.setAttribute("y", height - marginBottom + 18);
+      catLabel.setAttribute("text-anchor", "middle");
+      catLabel.setAttribute("class", "axis-label");
+      catLabel.textContent = row.label;
+      svg.appendChild(catLabel);
+    });
+
+    const holder = document.createElement("div");
+    holder.appendChild(svg);
+    return holder;
+
+    function addBar(svgEl, x, value, w, plotH, marginTop, color, tooltipLabel, rawVal) {
+      const v = value == null ? 0 : value;
+      const barH = plotH * v;
+      const y = marginTop + (plotH - barH);
+      const g = document.createElementNS(svgEl.namespaceURI, "g");
+      g.setAttribute("class", "bar-group");
+
+      const rect = document.createElementNS(svgEl.namespaceURI, "rect");
+      rect.setAttribute("x", x);
+      rect.setAttribute("y", y);
+      rect.setAttribute("width", w);
+      rect.setAttribute("height", Math.max(barH, 1));
+      rect.setAttribute("rx", 4);
+      rect.setAttribute("ry", 4);
+      rect.setAttribute("fill", color);
+      g.appendChild(rect);
+
+      // Square off the bottom corners (rx/ry rounds all four) by overlaying
+      // a small square patch at the baseline the width of the bar.
+      if (barH > 4) {
+        const patch = document.createElementNS(svgEl.namespaceURI, "rect");
+        patch.setAttribute("x", x);
+        patch.setAttribute("y", marginTop + plotH - 4);
+        patch.setAttribute("width", w);
+        patch.setAttribute("height", 4);
+        patch.setAttribute("fill", color);
+        g.appendChild(patch);
+      }
+
+      const label = document.createElementNS(svgEl.namespaceURI, "text");
+      label.setAttribute("x", x + w / 2);
+      label.setAttribute("y", y - 6);
+      label.setAttribute("text-anchor", "middle");
+      label.setAttribute("class", "value-label");
+      label.textContent = rawVal == null ? "—" : Math.round(rawVal * 100) + "%";
+      g.appendChild(label);
+
+      g.addEventListener("mousemove", (evt) => showTooltip(evt, `${tooltipLabel}: ${rawVal == null ? "no data" : Math.round(rawVal * 100) + "%"}`));
+      g.addEventListener("mouseleave", hideTooltip);
+
+      svgEl.appendChild(g);
+    }
+  }
+
+  function renderItemSection(agg) {
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    const heading = document.createElement("h2");
+    heading.style.margin = "0 0 4px";
+    heading.style.color = "var(--text-primary)";
+    heading.style.fontSize = "1.05rem";
+    heading.textContent = "Item-level detail (your class only)";
+    const sub = document.createElement("p");
+    sub.className = "muted";
+    sub.style.marginTop = "0";
+    sub.textContent = "No published US baseline exists at the individual-item level, only for the dimensions above.";
+    card.appendChild(heading);
+    card.appendChild(sub);
+
+    const table = document.createElement("table");
+    table.className = "data-table";
+    const statsById = Object.fromEntries(agg.itemStats.map((s) => [s.id, s]));
+    table.innerHTML = `
+      <thead>
+        <tr><th>#</th><th>Dimension</th><th>Item</th><th>N</th><th>Accuracy / mean</th><th>Mean confidence</th><th>Don't know</th></tr>
+      </thead>
+      <tbody>
+        ${ITEMS.map((item, i) => {
+          const s = statsById[item.id] || {};
+          const dimLabel = DIMENSIONS[item.dimension] ? DIMENSIONS[item.dimension].label : item.dimension;
+          const mainVal = item.type === "tf" ? fmtPct(s.accuracy) : fmtVal15(s.meanAgreement15);
+          const conf = item.type === "tf" ? fmtPct(s.meanConfidence) : "—";
+          const dk = item.type === "tf" ? fmtPct(s.dontKnowRate) : "—";
+          return `<tr>
+            <td>${i + 1}</td>
+            <td>${escapeHtml(dimLabel)}</td>
+            <td>${escapeHtml(item.text)}</td>
+            <td class="num">${s.n || 0}</td>
+            <td class="num">${mainVal}</td>
+            <td class="num">${conf}</td>
+            <td class="num">${dk}</td>
+          </tr>`;
+        }).join("")}
+      </tbody>
+    `;
+    card.appendChild(table);
+    return card;
+  }
+
+  function showTooltip(evt, text) {
+    const tip = document.getElementById("tooltip");
+    tip.textContent = text;
+    tip.style.left = (evt.clientX + 12) + "px";
+    tip.style.top = (evt.clientY + 12) + "px";
+    tip.style.opacity = "1";
+  }
+  function hideTooltip() {
+    document.getElementById("tooltip").style.opacity = "0";
+  }
+
+  function fmtPct(v) {
+    return v == null ? "—" : Math.round(v * 100) + "%";
+  }
+  function fmtVal15(v) {
+    return v == null ? "—" : v.toFixed(2) + " / 5";
+  }
+  function fmtDiff(a, b) {
+    if (a == null || b == null) return "—";
+    const d = (a - b) * 100;
+    const sign = d > 0 ? "+" : "";
+    return sign + Math.round(d) + " pts";
+  }
+  function escapeHtml(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+})();
+</script>
+</body>
+</html>

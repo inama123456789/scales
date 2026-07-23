@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Science Literacy Survey</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="progress-bar">
+  <div class="wrap" style="padding-top:0;padding-bottom:0;">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 14 answered</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <h1>Science Literacy Survey</h1>
+  <p class="lede">
+    This short survey asks you to judge whether some statements about science
+    are true or false, and how confident you are in your judgment. There are
+    no trick questions &mdash; just answer as best you can. It takes about
+    5&ndash;10 minutes.
+  </p>
+
+  <div class="card">
+    <label class="field-label" for="respondentId">Your participant ID (given by your instructor, or leave blank for anonymous)</label>
+    <input type="text" id="respondentId" placeholder="e.g. P07" autocomplete="off" />
+  </div>
+
+  <form id="surveyForm"></form>
+
+  <button class="submit" id="submitBtn" disabled>Submit answers</button>
+  <div id="statusMsg"></div>
+</div>
+
+<div class="wrap thankyou" id="thankYou" style="display:none;">
+  <h1>Thank you!</h1>
+  <p class="lede">Your responses have been recorded.</p>
+</div>
+
+<script src="items.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  const { ITEMS, TF_OPTIONS, AGREE_OPTIONS, TF_INTRO, AGREE_INTRO } = window.SCALE;
+  const form = document.getElementById("surveyForm");
+  const answers = {};
+
+  function renderTfItem(item, displayIndex) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="item-index">Statement ${displayIndex}</div>
+      <div class="item-text">${escapeHtml(item.text)}</div>
+      <div class="options" role="radiogroup" aria-label="Statement ${displayIndex}"></div>
+    `;
+    const opts = card.querySelector(".options");
+    TF_OPTIONS.forEach((opt) => {
+      const id = `${item.id}_${opt.value}`;
+      const label = document.createElement("label");
+      label.className = "option";
+      label.setAttribute("for", id);
+      label.innerHTML = `<input type="radio" name="${item.id}" id="${id}" value="${opt.value}" /><span>${escapeHtml(opt.label)}</span>`;
+      opts.appendChild(label);
+    });
+    card.querySelectorAll(`input[name="${item.id}"]`).forEach((input) => {
+      input.addEventListener("change", () => onAnswer(item.id, input.value, card));
+    });
+    return card;
+  }
+
+  function renderAgreeItem(item, displayIndex) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML = `
+      <div class="item-index">Statement ${displayIndex}</div>
+      <div class="item-text">${escapeHtml(item.text)}</div>
+      <div class="agree-row" role="radiogroup" aria-label="Statement ${displayIndex}"></div>
+    `;
+    const opts = card.querySelector(".agree-row");
+    AGREE_OPTIONS.forEach((opt) => {
+      const id = `${item.id}_${opt.value}`;
+      const label = document.createElement("label");
+      label.className = "option";
+      label.setAttribute("for", id);
+      label.innerHTML = `<input type="radio" name="${item.id}" id="${id}" value="${opt.value}" /><span>${escapeHtml(String(opt.label))}</span>`;
+      opts.appendChild(label);
+    });
+    card.querySelectorAll(`input[name="${item.id}"]`).forEach((input) => {
+      input.addEventListener("change", () => onAnswer(item.id, input.value, card));
+    });
+    return card;
+  }
+
+  function onAnswer(itemId, value, card) {
+    answers[itemId] = value;
+    card.querySelectorAll(".option").forEach((el) => {
+      const input = el.querySelector("input");
+      el.classList.toggle("checked", input.checked);
+    });
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const answered = Object.keys(answers).length;
+    document.getElementById("progressFill").style.width = (answered / ITEMS.length * 100) + "%";
+    document.getElementById("progressLabel").textContent = `${answered} / ${ITEMS.length} answered`;
+    document.getElementById("submitBtn").disabled = answered < ITEMS.length;
+  }
+
+  function escapeHtml(s) {
+    const d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  // Render: intro + civic/cognitive (tf) items, then intro + media (agree) items.
+  const tfItems = ITEMS.filter((i) => i.type === "tf");
+  const agreeItems = ITEMS.filter((i) => i.type === "agree");
+
+  const tfIntro = document.createElement("h2");
+  tfIntro.textContent = "Part 1";
+  const tfIntroP = document.createElement("p");
+  tfIntroP.className = "lede";
+  tfIntroP.textContent = TF_INTRO;
+  form.appendChild(tfIntro);
+  form.appendChild(tfIntroP);
+  tfItems.forEach((item, i) => form.appendChild(renderTfItem(item, i + 1)));
+
+  const agreeIntro = document.createElement("h2");
+  agreeIntro.textContent = "Part 2";
+  const agreeIntroP = document.createElement("p");
+  agreeIntroP.className = "lede";
+  agreeIntroP.textContent = AGREE_INTRO;
+  form.appendChild(agreeIntro);
+  form.appendChild(agreeIntroP);
+  agreeItems.forEach((item, i) => form.appendChild(renderAgreeItem(item, tfItems.length + i + 1)));
+
+  document.getElementById("submitBtn").addEventListener("click", submit);
+
+  async function submit() {
+    const btn = document.getElementById("submitBtn");
+    const statusEl = document.getElementById("statusMsg");
+    statusEl.innerHTML = "";
+
+    if (Object.keys(answers).length < ITEMS.length) {
+      statusEl.innerHTML = `<div class="status-msg error">Please answer all statements before submitting.</div>`;
+      return;
+    }
+    if (!window.APP_CONFIG || window.APP_CONFIG.ENDPOINT_URL.indexOf("PASTE_YOUR") === 0) {
+      statusEl.innerHTML = `<div class="status-msg error">This survey isn't connected to a data endpoint yet. See config.js / SETUP.md.</div>`;
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Submitting…";
+
+    const payload = {
+      secret: window.APP_CONFIG.SHARED_SECRET,
+      respondentId: document.getElementById("respondentId").value.trim() || "anonymous",
+      answers,
+      submittedAt: new Date().toISOString(),
+    };
+
+    try {
+      const res = await fetch(window.APP_CONFIG.ENDPOINT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" }, // avoids CORS preflight against Apps Script
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || `Request failed (${res.status})`);
+      }
+      document.querySelector(".progress-bar").style.display = "none";
+      document.querySelector(".wrap").style.display = "none";
+      document.getElementById("thankYou").style.display = "block";
+    } catch (err) {
+      statusEl.innerHTML = `<div class="status-msg error">Could not submit: ${escapeHtml(err.message)}. Please try again.</div>`;
+      btn.disabled = false;
+      btn.textContent = "Submit answers";
+    }
+  }
+})();
+</script>
+</body>
+</html>
