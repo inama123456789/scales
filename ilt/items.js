@@ -349,7 +349,7 @@ const ILT_ITEMS = [
       { key: "c", text: "I cannot publish the picture of the person without her/his permission." },
       { key: "d", text: "I will publish the picture because the international activities of the person are public and are based on universal ethical principles." },
     ],
-    correct: "d",
+    correct: "c",
   },
   {
     id: "q29",
