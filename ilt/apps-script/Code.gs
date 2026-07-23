@@ -8,7 +8,7 @@
  * doGet  -> returns all stored responses as JSON, for ilt/dashboard.html.
  */
 
-const SECRET = "change-me"; // must match window.APP_CONFIG.SHARED_SECRET in ilt/config.js
+const SECRET = "information literacy boh podgornik"; // must match window.APP_CONFIG.SHARED_SECRET in ilt/config.js
 const SHEET_NAME = "Responses";
 
 // 40 item ids, in order — must match ilt/items.js (ILT_ITEMS[].id).
