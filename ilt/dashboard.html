@@ -1,0 +1,253 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Information Literacy Test — Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+  .wrap { max-width: 980px; }
+  .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .toolbar .spacer { flex: 1; }
+  button.secondary {
+    padding: 8px 14px; border-radius: 8px; border: 1px solid var(--gridline);
+    background: var(--surface-1); color: var(--text-primary); cursor: pointer; font-size: 0.85rem;
+  }
+  button.secondary:hover { border-color: var(--series-1); }
+  .stat-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat-tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; min-width: 150px; }
+  .stat-tile .label { font-size: 0.78rem; color: var(--text-secondary); }
+  .stat-tile .value { font-size: 1.6rem; font-weight: 600; margin-top: 2px; }
+  .legend { display: flex; gap: 18px; align-items: center; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-secondary); flex-wrap: wrap; }
+  .legend .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .legend .dashkey { display: inline-block; width: 14px; border-top: 2px dashed var(--text-muted); margin-right: 6px; vertical-align: 3px; }
+  .chart-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 20px; }
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .axis-label { fill: var(--text-muted); font-size: 11px; }
+  .value-label { fill: var(--text-primary); font-size: 12px; font-weight: 600; }
+  .gridline { stroke: var(--gridline); stroke-width: 1; }
+  .tooltip { position: fixed; pointer-events: none; background: var(--text-primary); color: var(--page); padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; opacity: 0; transition: opacity 0.1s; z-index: 20; white-space: nowrap; }
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.data-table th, table.data-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--gridline); }
+  table.data-table th { color: var(--text-secondary); font-weight: 600; font-size: 0.78rem; }
+  table.data-table td.num { font-variant-numeric: tabular-nums; }
+  .empty-state { text-align: center; padding: 48px 16px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Information Literacy Test — Dashboard</h1>
+  <p class="lede">Your class's results compared with the published validation-sample baseline (Boh Podgornik et al., 2016).</p>
+
+  <div class="toolbar">
+    <button class="secondary" id="refreshBtn">Refresh data</button>
+    <span class="muted" id="lastUpdated"></span>
+    <div class="spacer"></div>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script src="items.js"></script>
+<script src="scoring.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  const { ITEMS, BASELINE } = window.ILT;
+  const { aggregateClass } = window.ILT_SCORING;
+
+  const COLOR_CLASS = cssVar("--series-1", "#2a78d6");
+  const COLOR_BASE = cssVar("--series-2", "#eb6834");
+  const COLOR_MUTED = cssVar("--text-muted", "#898781");
+
+  function cssVar(name, fallback) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  }
+
+  document.getElementById("refreshBtn").addEventListener("click", load);
+  load();
+
+  async function load() {
+    const content = document.getElementById("content");
+    if (!window.APP_CONFIG || window.APP_CONFIG.ENDPOINT_URL.indexOf("PASTE_YOUR") === 0) {
+      content.innerHTML = '<div class="empty-state">This dashboard isn\'t connected to a data endpoint yet. See config.js / SETUP.md.</div>';
+      return;
+    }
+    try {
+      const url = window.APP_CONFIG.ENDPOINT_URL + "?secret=" + encodeURIComponent(window.APP_CONFIG.SHARED_SECRET);
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Request failed");
+      document.getElementById("lastUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
+      render(aggregateClass(ITEMS, data.respondents || []));
+    } catch (err) {
+      content.innerHTML = '<div class="empty-state">Could not load data: ' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  function render(agg) {
+    const content = document.getElementById("content");
+    if (!agg.n) {
+      content.innerHTML = '<div class="empty-state">No responses yet. Once participants submit the test, results will appear here.</div>';
+      return;
+    }
+    content.innerHTML = "";
+    content.appendChild(renderStatRow(agg));
+    content.appendChild(renderOverviewChart(agg));
+    content.appendChild(renderItemSection(agg));
+  }
+
+  function renderStatRow(agg) {
+    const div = document.createElement("div");
+    div.className = "stat-row";
+    const meanScore40 = (agg.meanPercent / 100 * ITEMS.length);
+    const tiles = [
+      { label: "Respondents", value: String(agg.n) },
+      { label: "Class mean score", value: meanScore40.toFixed(1) + " / " + ITEMS.length },
+      { label: "Class mean % correct", value: Math.round(agg.meanPercent) + "%" },
+      { label: "Baseline (" + BASELINE.label + ")", value: BASELINE.meanPercent + "%" },
+    ];
+    tiles.forEach((t) => {
+      const el = document.createElement("div");
+      el.className = "stat-tile";
+      el.innerHTML = '<div class="label">' + escapeHtml(t.label) + '</div><div class="value">' + escapeHtml(t.value) + "</div>";
+      div.appendChild(el);
+    });
+    return div;
+  }
+
+  // Overview: two bars (your class, baseline) with an optional dashed
+  // reference line for the post-training mean.
+  function renderOverviewChart(agg) {
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    const h = document.createElement("h2");
+    h.style.cssText = "margin:0 0 12px;color:var(--text-primary);font-size:1.05rem;";
+    h.textContent = "Overall % correct: your class vs. baseline";
+    card.appendChild(h);
+
+    const legend = document.createElement("div");
+    legend.className = "legend";
+    legend.innerHTML =
+      '<span><span class="swatch" style="background:' + COLOR_CLASS + '"></span>Your class</span>' +
+      '<span><span class="swatch" style="background:' + COLOR_BASE + '"></span>Validation sample (published)</span>' +
+      (BASELINE.postTrainingPercent ? '<span><span class="dashkey"></span>After IL course (' + BASELINE.postTrainingPercent + "%)</span>" : "");
+    card.appendChild(legend);
+
+    const rows = [
+      { label: "Your class", value: agg.meanPercent, color: COLOR_CLASS },
+      { label: "Validation sample", value: BASELINE.meanPercent, color: COLOR_BASE },
+    ];
+
+    const width = 900, height = 260, mTop = 20, mBottom = 40, mLeft = 8, mRight = 8;
+    const plotH = height - mTop - mBottom;
+    const groupW = (width - mLeft - mRight) / rows.length;
+    const barW = 90;
+
+    const svg = svgEl("svg");
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("style", "max-width:520px;height:auto;display:block;");
+
+    [0, 0.25, 0.5, 0.75, 1].forEach((t) => {
+      const y = mTop + plotH * (1 - t);
+      const line = svgEl("line");
+      setAttrs(line, { x1: mLeft, x2: width - mRight, y1: y, y2: y, class: "gridline" });
+      svg.appendChild(line);
+      const lab = svgEl("text");
+      setAttrs(lab, { x: mLeft, y: y - 4, class: "axis-label" });
+      lab.textContent = Math.round(t * 100) + "%";
+      svg.appendChild(lab);
+    });
+
+    rows.forEach((row, i) => {
+      const cx = mLeft + groupW * i + groupW / 2;
+      const barH = plotH * (row.value / 100);
+      const y = mTop + (plotH - barH);
+      const g = svgEl("g");
+
+      const rect = svgEl("rect");
+      setAttrs(rect, { x: cx - barW / 2, y: y, width: barW, height: Math.max(barH, 1), rx: 4, ry: 4, fill: row.color });
+      g.appendChild(rect);
+      const patch = svgEl("rect");
+      setAttrs(patch, { x: cx - barW / 2, y: mTop + plotH - 4, width: barW, height: 4, fill: row.color });
+      g.appendChild(patch);
+
+      const val = svgEl("text");
+      setAttrs(val, { x: cx, y: y - 7, "text-anchor": "middle", class: "value-label" });
+      val.textContent = Math.round(row.value) + "%";
+      g.appendChild(val);
+
+      const lab = svgEl("text");
+      setAttrs(lab, { x: cx, y: height - mBottom + 20, "text-anchor": "middle", class: "axis-label" });
+      lab.textContent = row.label;
+      g.appendChild(lab);
+
+      g.addEventListener("mousemove", (e) => showTip(e, row.label + ": " + row.value.toFixed(1) + "%"));
+      g.addEventListener("mouseleave", hideTip);
+      svg.appendChild(g);
+    });
+
+    // Dashed post-training reference line across the plot.
+    if (BASELINE.postTrainingPercent) {
+      const y = mTop + plotH * (1 - BASELINE.postTrainingPercent / 100);
+      const ref = svgEl("line");
+      setAttrs(ref, { x1: mLeft, x2: width - mRight, y1: y, y2: y, stroke: COLOR_MUTED, "stroke-width": 2, "stroke-dasharray": "5 4" });
+      svg.appendChild(ref);
+    }
+
+    const holder = document.createElement("div");
+    holder.appendChild(svg);
+    card.appendChild(holder);
+    return card;
+  }
+
+  function renderItemSection(agg) {
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    const h = document.createElement("h2");
+    h.style.cssText = "margin:0 0 4px;color:var(--text-primary);font-size:1.05rem;";
+    h.textContent = "Item-level accuracy (your class)";
+    const sub = document.createElement("p");
+    sub.className = "muted";
+    sub.style.marginTop = "0";
+    sub.textContent = "Percentage of your class that answered each question correctly. Sorted by difficulty (hardest first).";
+    card.appendChild(h);
+    card.appendChild(sub);
+
+    const stats = agg.itemStats.slice().sort((a, b) => (a.accuracy ?? 0) - (b.accuracy ?? 0));
+    const byId = Object.fromEntries(ITEMS.map((it, i) => [it.id, { item: it, num: i + 1 }]));
+
+    const table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML =
+      "<thead><tr><th>#</th><th>Question</th><th>Correct</th><th>% correct</th></tr></thead><tbody>" +
+      stats.map((s) => {
+        const meta = byId[s.id];
+        const short = meta.item.text.length > 90 ? meta.item.text.slice(0, 90) + "…" : meta.item.text;
+        return "<tr><td>" + meta.num + "</td><td>" + escapeHtml(short) +
+          "</td><td class='num'>" + s.nCorrect + " / " + agg.n +
+          "</td><td class='num'>" + (s.accuracy == null ? "—" : Math.round(s.accuracy * 100) + "%") + "</td></tr>";
+      }).join("") +
+      "</tbody>";
+    card.appendChild(table);
+    return card;
+  }
+
+  function svgEl(tag) { return document.createElementNS("http://www.w3.org/2000/svg", tag); }
+  function setAttrs(el, o) { for (const k in o) el.setAttribute(k, o[k]); }
+  function showTip(e, text) {
+    const tip = document.getElementById("tooltip");
+    tip.textContent = text;
+    tip.style.left = (e.clientX + 12) + "px";
+    tip.style.top = (e.clientY + 12) + "px";
+    tip.style.opacity = "1";
+  }
+  function hideTip() { document.getElementById("tooltip").style.opacity = "0"; }
+  function escapeHtml(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+})();
+</script>
+</body>
+</html>

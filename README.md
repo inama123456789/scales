@@ -1,3 +1,19 @@
+# Classroom survey apps
+
+This repo hosts **two independent survey apps** that share the same setup
+recipe but are otherwise completely separate (own items, own answer keys, own
+baselines, own Google Sheets, own dashboards):
+
+| App | Folder | What it measures |
+|-----|--------|------------------|
+| Science Literacy Scale | repo root (`index.html`, `dashboard.html`) | 14-item digital science-literacy scale (Mede et al., 2025), vs. US population |
+| Information Literacy Test | [`ilt/`](./ilt/) | 40-item information-literacy test (Boh Podgornik et al., 2016), vs. validation-sample baseline |
+
+Each has its own `SETUP.md`. The section below documents the first app; for the
+Information Literacy Test see [`ilt/SETUP.md`](./ilt/SETUP.md).
+
+---
+
 # Science Literacy Scale — classroom app
 
 A small survey app implementing the 14-item science literacy scale from:
