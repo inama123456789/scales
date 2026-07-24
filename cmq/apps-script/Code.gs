@@ -8,7 +8,7 @@
  * doGet  -> returns all stored responses as JSON, for cmq/dashboard.html.
  */
 
-const SECRET = "change-me"; // must match window.APP_CONFIG.SHARED_SECRET in cmq/config.js
+const SECRET = "cmq bruder"; // must match window.APP_CONFIG.SHARED_SECRET in cmq/config.js
 const SHEET_NAME = "Responses";
 
 // 5 item ids, in order — must match cmq/items.js (CMQ_ITEMS[].id).
