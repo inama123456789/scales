@@ -5,7 +5,7 @@
  * deployment. See psd/SETUP.md.
  */
 
-const SECRET = "change-me"; // must match window.APP_CONFIG.SHARED_SECRET in psd/config.js
+const SECRET = "psydisc v"; // must match window.APP_CONFIG.SHARED_SECRET in psd/config.js
 const SHEET_NAME = "Responses";
 
 // 16 item ids, in order — must match psd/items.js (PSD_ITEMS[].id).
