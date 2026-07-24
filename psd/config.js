@@ -5,6 +5,6 @@
  * deployment. Do not reuse another survey's endpoint.
  */
 window.APP_CONFIG = {
-  ENDPOINT_URL: "PASTE_YOUR_PSYDISC_APPS_SCRIPT_WEB_APP_URL_HERE",
-  SHARED_SECRET: "change-me",
+  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbw4-WHRHlc2WOKBFzWJSkRxi-fw5bekxfVQxFBYcXEzS3efSM2zbKHnVhMnyemdbBcEOw/exec",
+  SHARED_SECRET: "psydisc v",
 };
