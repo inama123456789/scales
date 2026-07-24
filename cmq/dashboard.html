@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Conspiracy Mentality Questionnaire — Dashboard</title>
+<link rel="stylesheet" href="style.css" />
+<style>
+  .wrap { max-width: 1000px; }
+  .toolbar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+  .toolbar .spacer { flex: 1; }
+  button.secondary { padding: 8px 14px; border-radius: 8px; border: 1px solid var(--gridline); background: var(--surface-1); color: var(--text-primary); cursor: pointer; font-size: 0.85rem; }
+  button.secondary:hover { border-color: var(--series-1); }
+  .stat-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .stat-tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; min-width: 150px; }
+  .stat-tile .label { font-size: 0.78rem; color: var(--text-secondary); }
+  .stat-tile .value { font-size: 1.6rem; font-weight: 600; margin-top: 2px; }
+  .legend { display: flex; gap: 16px; align-items: center; margin-bottom: 8px; font-size: 0.85rem; color: var(--text-secondary); flex-wrap: wrap; }
+  .legend .swatch { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .chart-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 18px; margin-bottom: 20px; }
+  svg text { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .axis-label { fill: var(--text-muted); font-size: 11px; }
+  .value-label { fill: var(--text-primary); font-size: 11px; font-weight: 600; }
+  .gridline { stroke: var(--gridline); stroke-width: 1; }
+  .tooltip { position: fixed; pointer-events: none; background: var(--text-primary); color: var(--page); padding: 6px 10px; border-radius: 6px; font-size: 0.8rem; opacity: 0; transition: opacity 0.1s; z-index: 20; white-space: nowrap; }
+  table.data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  table.data-table th, table.data-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--gridline); }
+  table.data-table th { color: var(--text-secondary); font-weight: 600; font-size: 0.78rem; }
+  table.data-table td.num { font-variant-numeric: tabular-nums; }
+  .empty-state { text-align: center; padding: 48px 16px; color: var(--text-secondary); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Conspiracy Mentality Questionnaire — Dashboard</h1>
+  <p class="lede">Your class's conspiracy-mentality scores compared with the three published validation samples (Bruder et al., 2013). Scale: 0 (certainly not) to 10 (certainly); higher = stronger conspiracy mentality.</p>
+
+  <div class="toolbar">
+    <button class="secondary" id="refreshBtn">Refresh data</button>
+    <span class="muted" id="lastUpdated"></span>
+    <div class="spacer"></div>
+  </div>
+
+  <div id="content"></div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script src="items.js"></script>
+<script src="scoring.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  const { ITEMS, BASELINES } = window.CMQ;
+  const { aggregateClass } = window.CMQ_SCORING;
+
+  const C_CLASS = cssVar("--series-1", "#2a78d6");
+  const C_DE = cssVar("--series-2", "#eb6834");
+  const C_EN = cssVar("--series-3", "#1baf7a");
+  const C_TR = cssVar("--series-4", "#eda100");
+  const SERIES = [
+    { key: "class", label: "Your class", color: C_CLASS },
+    { key: "german", label: BASELINES.german.label, color: C_DE },
+    { key: "english", label: BASELINES.english.label, color: C_EN },
+    { key: "turkish", label: BASELINES.turkish.label, color: C_TR },
+  ];
+  const MAX = 10;
+
+  function cssVar(n, f) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || f; }
+
+  document.getElementById("refreshBtn").addEventListener("click", load);
+  load();
+
+  async function load() {
+    const content = document.getElementById("content");
+    if (!window.APP_CONFIG || window.APP_CONFIG.ENDPOINT_URL.indexOf("PASTE_YOUR") === 0) {
+      content.innerHTML = '<div class="empty-state">This dashboard isn\'t connected to a data endpoint yet. See config.js / SETUP.md.</div>';
+      return;
+    }
+    try {
+      const url = window.APP_CONFIG.ENDPOINT_URL + "?secret=" + encodeURIComponent(window.APP_CONFIG.SHARED_SECRET);
+      const res = await fetch(url);
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "Request failed");
+      document.getElementById("lastUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
+      render(aggregateClass(ITEMS, data.respondents || []));
+    } catch (err) {
+      content.innerHTML = '<div class="empty-state">Could not load data: ' + escapeHtml(err.message) + "</div>";
+    }
+  }
+
+  function render(agg) {
+    const content = document.getElementById("content");
+    if (!agg.n) {
+      content.innerHTML = '<div class="empty-state">No responses yet. Once participants submit the survey, results will appear here.</div>';
+      return;
+    }
+    content.innerHTML = "";
+    content.appendChild(statRow(agg));
+    content.appendChild(overallChart(agg));
+    content.appendChild(perItemChart(agg));
+    content.appendChild(perItemTable(agg));
+  }
+
+  function statRow(agg) {
+    const div = document.createElement("div");
+    div.className = "stat-row";
+    const tiles = [
+      { label: "Respondents", value: String(agg.n) },
+      { label: "Class mean (0–10)", value: fmt(agg.overallMean) },
+      { label: "German mean", value: fmt(BASELINES.german.overall) },
+      { label: "English mean", value: fmt(BASELINES.english.overall) },
+      { label: "Turkish mean", value: fmt(BASELINES.turkish.overall) },
+    ];
+    tiles.forEach((t) => {
+      const el = document.createElement("div");
+      el.className = "stat-tile";
+      el.innerHTML = '<div class="label">' + escapeHtml(t.label) + '</div><div class="value">' + escapeHtml(t.value) + "</div>";
+      div.appendChild(el);
+    });
+    return div;
+  }
+
+  function legend() {
+    const div = document.createElement("div");
+    div.className = "legend";
+    div.innerHTML = SERIES.map((s) => '<span><span class="swatch" style="background:' + s.color + '"></span>' + escapeHtml(s.label) + "</span>").join("");
+    return div;
+  }
+
+  // Overall CMQ mean: your class vs the three samples (4 bars).
+  function overallChart(agg) {
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    card.appendChild(heading("Overall conspiracy-mentality score"));
+    card.appendChild(legend());
+    const rows = [
+      { label: "Your class", value: agg.overallMean, color: C_CLASS },
+      { label: "German", value: BASELINES.german.overall, color: C_DE },
+      { label: "English", value: BASELINES.english.overall, color: C_EN },
+      { label: "Turkish", value: BASELINES.turkish.overall, color: C_TR },
+    ];
+    card.appendChild(barChart(rows, 560));
+    return card;
+  }
+
+  // Per-item grouped bars: 4 series across the 5 items.
+  function perItemChart(agg) {
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    card.appendChild(heading("By item: your class vs. published samples"));
+    card.appendChild(legend());
+
+    const width = 980, height = 340, mTop = 20, mBottom = 54, mLeft = 8, mRight = 8;
+    const plotH = height - mTop - mBottom;
+    const groupW = (width - mLeft - mRight) / ITEMS.length;
+    const barW = Math.min(18, (groupW - 16) / SERIES.length);
+    const gap = 2;
+
+    const svg = svgEl("svg");
+    setAttrs(svg, { viewBox: "0 0 " + width + " " + height, width: "100%", style: "max-width:100%;height:auto;display:block;" });
+
+    for (let t = 0; t <= MAX; t += 2) {
+      const y = mTop + plotH * (1 - t / MAX);
+      const line = svgEl("line"); setAttrs(line, { x1: mLeft, x2: width - mRight, y1: y, y2: y, class: "gridline" }); svg.appendChild(line);
+      const lab = svgEl("text"); setAttrs(lab, { x: mLeft, y: y - 3, class: "axis-label" }); lab.textContent = t; svg.appendChild(lab);
+    }
+
+    ITEMS.forEach((item, i) => {
+      const vals = [
+        { label: "Your class", value: agg.itemMeans[item.id], color: C_CLASS },
+        { label: "German", value: BASELINES.german.items[item.id], color: C_DE },
+        { label: "English", value: BASELINES.english.items[item.id], color: C_EN },
+        { label: "Turkish", value: BASELINES.turkish.items[item.id], color: C_TR },
+      ];
+      const pairW = barW * SERIES.length + gap * (SERIES.length - 1);
+      const cx = mLeft + groupW * i + groupW / 2;
+      let x = cx - pairW / 2;
+      vals.forEach((v) => {
+        const val = v.value == null ? 0 : v.value;
+        const barH = plotH * (val / MAX);
+        const y = mTop + (plotH - barH);
+        const g = svgEl("g");
+        const rect = svgEl("rect"); setAttrs(rect, { x: x, y: y, width: barW, height: Math.max(barH, 1), rx: 3, ry: 3, fill: v.color }); g.appendChild(rect);
+        const patch = svgEl("rect"); setAttrs(patch, { x: x, y: mTop + plotH - 3, width: barW, height: 3, fill: v.color }); g.appendChild(patch);
+        g.addEventListener("mousemove", (e) => showTip(e, "Item " + (i + 1) + " — " + v.label + ": " + (v.value == null ? "no data" : fmt(v.value))));
+        g.addEventListener("mouseleave", hideTip);
+        svg.appendChild(g);
+        x += barW + gap;
+      });
+      const lab = svgEl("text"); setAttrs(lab, { x: cx, y: height - mBottom + 18, "text-anchor": "middle", class: "axis-label" }); lab.textContent = "Item " + (i + 1); svg.appendChild(lab);
+    });
+
+    const holder = document.createElement("div");
+    holder.appendChild(svg);
+    card.appendChild(holder);
+    return card;
+  }
+
+  function perItemTable(agg) {
+    const card = document.createElement("div");
+    card.className = "chart-card";
+    card.appendChild(heading("Item detail"));
+    const table = document.createElement("table");
+    table.className = "data-table";
+    table.innerHTML =
+      "<thead><tr><th>#</th><th>Statement</th><th>Your class</th><th>German</th><th>English</th><th>Turkish</th></tr></thead><tbody>" +
+      ITEMS.map((item, i) => {
+        const short = item.text.length > 70 ? item.text.slice(0, 70) + "…" : item.text;
+        return "<tr><td>" + (i + 1) + "</td><td>" + escapeHtml(short) + "</td>" +
+          "<td class='num'>" + fmt(agg.itemMeans[item.id]) + "</td>" +
+          "<td class='num'>" + fmt(BASELINES.german.items[item.id]) + "</td>" +
+          "<td class='num'>" + fmt(BASELINES.english.items[item.id]) + "</td>" +
+          "<td class='num'>" + fmt(BASELINES.turkish.items[item.id]) + "</td></tr>";
+      }).join("") + "</tbody>";
+    card.appendChild(table);
+    return card;
+  }
+
+  // Simple single-series bar chart (0-10 axis).
+  function barChart(rows, maxWidth) {
+    const width = 900, height = 260, mTop = 20, mBottom = 40, mLeft = 8, mRight = 8;
+    const plotH = height - mTop - mBottom;
+    const groupW = (width - mLeft - mRight) / rows.length;
+    const barW = 70;
+    const svg = svgEl("svg");
+    setAttrs(svg, { viewBox: "0 0 " + width + " " + height, width: "100%", style: "max-width:" + maxWidth + "px;height:auto;display:block;" });
+    for (let t = 0; t <= MAX; t += 2) {
+      const y = mTop + plotH * (1 - t / MAX);
+      const line = svgEl("line"); setAttrs(line, { x1: mLeft, x2: width - mRight, y1: y, y2: y, class: "gridline" }); svg.appendChild(line);
+      const lab = svgEl("text"); setAttrs(lab, { x: mLeft, y: y - 3, class: "axis-label" }); lab.textContent = t; svg.appendChild(lab);
+    }
+    rows.forEach((row, i) => {
+      const cx = mLeft + groupW * i + groupW / 2;
+      const val = row.value == null ? 0 : row.value;
+      const barH = plotH * (val / MAX);
+      const y = mTop + (plotH - barH);
+      const g = svgEl("g");
+      const rect = svgEl("rect"); setAttrs(rect, { x: cx - barW / 2, y: y, width: barW, height: Math.max(barH, 1), rx: 4, ry: 4, fill: row.color }); g.appendChild(rect);
+      const patch = svgEl("rect"); setAttrs(patch, { x: cx - barW / 2, y: mTop + plotH - 4, width: barW, height: 4, fill: row.color }); g.appendChild(patch);
+      const val2 = svgEl("text"); setAttrs(val2, { x: cx, y: y - 7, "text-anchor": "middle", class: "value-label" }); val2.textContent = fmt(row.value); g.appendChild(val2);
+      const lab = svgEl("text"); setAttrs(lab, { x: cx, y: height - mBottom + 20, "text-anchor": "middle", class: "axis-label" }); lab.textContent = row.label; g.appendChild(lab);
+      g.addEventListener("mousemove", (e) => showTip(e, row.label + ": " + fmt(row.value) + " / 10"));
+      g.addEventListener("mouseleave", hideTip);
+      svg.appendChild(g);
+    });
+    const holder = document.createElement("div");
+    holder.appendChild(svg);
+    return holder;
+  }
+
+  function heading(t) {
+    const h = document.createElement("h2");
+    h.style.cssText = "margin:0 0 12px;color:var(--text-primary);font-size:1.05rem;";
+    h.textContent = t;
+    return h;
+  }
+  function fmt(v) { return v == null ? "—" : (Math.round(v * 100) / 100).toFixed(2); }
+  function svgEl(t) { return document.createElementNS("http://www.w3.org/2000/svg", t); }
+  function setAttrs(el, o) { for (const k in o) el.setAttribute(k, o[k]); }
+  function showTip(e, text) { const tip = document.getElementById("tooltip"); tip.textContent = text; tip.style.left = (e.clientX + 12) + "px"; tip.style.top = (e.clientY + 12) + "px"; tip.style.opacity = "1"; }
+  function hideTip() { document.getElementById("tooltip").style.opacity = "0"; }
+  function escapeHtml(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+})();
+</script>
+</body>
+</html>

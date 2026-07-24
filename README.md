@@ -8,6 +8,7 @@ baselines, own Google Sheets, own dashboards):
 |-----|--------|------------------|
 | Science Literacy Scale | repo root (`index.html`, `dashboard.html`) | 14-item digital science-literacy scale (Mede et al., 2025), vs. US population |
 | Information Literacy Test | [`ilt/`](./ilt/) | 40-item information-literacy test (Boh Podgornik et al., 2016), vs. validation-sample baseline |
+| Conspiracy Mentality Questionnaire | [`cmq/`](./cmq/) | 5-item CMQ (Bruder et al., 2013), vs. German/English/Turkish validation samples |
 
 Each has its own `SETUP.md`. The section below documents the first app; for the
 Information Literacy Test see [`ilt/SETUP.md`](./ilt/SETUP.md).

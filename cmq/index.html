@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Conspiracy Mentality Questionnaire</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+<div class="progress-bar">
+  <div class="wrap" style="padding-top:0;padding-bottom:0;">
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="progress-label" id="progressLabel">0 / 5 answered</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <h1>Conspiracy Mentality Questionnaire</h1>
+  <p class="lede" id="scaleIntro"></p>
+
+  <div class="card">
+    <label class="field-label" for="respondentId">Your participant ID (given by your instructor, or leave blank for anonymous)</label>
+    <input type="text" id="respondentId" placeholder="e.g. P07" autocomplete="off" />
+  </div>
+
+  <form id="surveyForm"></form>
+
+  <button class="submit" id="submitBtn" disabled>Submit answers</button>
+  <div id="statusMsg"></div>
+</div>
+
+<div class="wrap thankyou" id="thankYou" style="display:none;">
+  <h1>Thank you!</h1>
+  <p class="lede">Your answers have been recorded.</p>
+</div>
+
+<script src="items.js"></script>
+<script src="config.js"></script>
+<script>
+(function () {
+  const { ITEMS, SCALE, SCALE_INTRO } = window.CMQ;
+  const form = document.getElementById("surveyForm");
+  const answers = {};
+  document.getElementById("scaleIntro").textContent = SCALE_INTRO;
+
+  function escapeHtml(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+  function renderItem(item, i) {
+    const card = document.createElement("div");
+    card.className = "card";
+    card.innerHTML =
+      '<div class="item-index">Statement ' + (i + 1) + " of " + ITEMS.length + "</div>" +
+      '<div class="item-text">' + escapeHtml(item.text) + "</div>" +
+      '<div class="scale" role="radiogroup" aria-label="Statement ' + (i + 1) + '"></div>' +
+      '<div class="scale-anchors"><span>0% &middot; certainly not</span><span>50% &middot; undecided</span><span>100% &middot; certainly</span></div>';
+    const scale = card.querySelector(".scale");
+    SCALE.forEach((opt) => {
+      const wrap = document.createElement("div");
+      wrap.className = "scale-opt";
+      const id = item.id + "_" + opt.value;
+      wrap.innerHTML =
+        '<label for="' + id + '" title="' + opt.percent + "% &mdash; " + escapeHtml(opt.anchor) + '">' +
+        '<span class="pct">' + opt.percent + "%</span>" +
+        '<input type="radio" name="' + item.id + '" id="' + id + '" value="' + opt.value + '" />' +
+        "</label>";
+      scale.appendChild(wrap);
+    });
+    card.querySelectorAll('input[name="' + item.id + '"]').forEach((input) => {
+      input.addEventListener("change", () => onAnswer(item.id, input.value, card));
+    });
+    return card;
+  }
+
+  function onAnswer(itemId, value, card) {
+    answers[itemId] = value;
+    card.querySelectorAll(".scale-opt").forEach((el) => {
+      el.classList.toggle("checked", el.querySelector("input").checked);
+    });
+    updateProgress();
+  }
+
+  function updateProgress() {
+    const answered = Object.keys(answers).length;
+    document.getElementById("progressFill").style.width = (answered / ITEMS.length * 100) + "%";
+    document.getElementById("progressLabel").textContent = answered + " / " + ITEMS.length + " answered";
+    document.getElementById("submitBtn").disabled = answered < ITEMS.length;
+  }
+
+  ITEMS.forEach((item, i) => form.appendChild(renderItem(item, i)));
+  document.getElementById("submitBtn").addEventListener("click", submit);
+
+  async function submit() {
+    const btn = document.getElementById("submitBtn");
+    const statusEl = document.getElementById("statusMsg");
+    statusEl.innerHTML = "";
+    if (Object.keys(answers).length < ITEMS.length) {
+      statusEl.innerHTML = '<div class="status-msg error">Please answer all statements before submitting.</div>';
+      return;
+    }
+    if (!window.APP_CONFIG || window.APP_CONFIG.ENDPOINT_URL.indexOf("PASTE_YOUR") === 0) {
+      statusEl.innerHTML = '<div class="status-msg error">This survey isn\'t connected to a data endpoint yet. See config.js / SETUP.md.</div>';
+      return;
+    }
+    btn.disabled = true; btn.textContent = "Submitting…";
+    const payload = {
+      secret: window.APP_CONFIG.SHARED_SECRET,
+      respondentId: document.getElementById("respondentId").value.trim() || "anonymous",
+      answers, submittedAt: new Date().toISOString(),
+    };
+    try {
+      const res = await fetch(window.APP_CONFIG.ENDPOINT_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) throw new Error(data.error || ("Request failed (" + res.status + ")"));
+      document.querySelector(".progress-bar").style.display = "none";
+      document.querySelector(".wrap").style.display = "none";
+      document.getElementById("thankYou").style.display = "block";
+    } catch (err) {
+      statusEl.innerHTML = '<div class="status-msg error">Could not submit: ' + escapeHtml(err.message) + ". Please try again.</div>";
+      btn.disabled = false; btn.textContent = "Submit answers";
+    }
+  }
+})();
+</script>
+</body>
+</html>
