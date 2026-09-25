@@ -12,6 +12,6 @@
  * threat model.
  */
 window.APP_CONFIG = {
-  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbzlH6nY05PEH3gt4uRfLcfBTXDi5Np7byfphbjsHyQH7rL8_8c4lkh5Sn6NrcWfNDp1/exec",
-  SHARED_SECRET: "Mede_scientific_literacy",
+  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbw3LF1lyCLFvIe8XZJerqO5ZXwFgILfD0PaVKQVA_W_XTNM5S0L2fL8iECeqeB4EFIW/exec",
+  SHARED_SECRET: "MEDE",
 };
