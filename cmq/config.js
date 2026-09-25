@@ -8,6 +8,6 @@
  * SHARED_SECRET: must match SECRET in cmq/apps-script/Code.gs.
  */
 window.APP_CONFIG = {
-  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbzu12LW3-P2CQWQqSGXfYkfv8IhDLH6t1U0BlICXc5DdoYR3atM6tYGUKoyRGmA6ToR/exec",
-  SHARED_SECRET: "cmq bruder",
+  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbzwNSj5d8p7XCUaX_cNpUmnVWunu8KFzO8pCZTLBnCjlBh3aGjLBLYb8m4vhGZ_J_7a/exec",
+  SHARED_SECRET: "BRUDER",
 };
