@@ -10,6 +10,6 @@
  * protection only (visible in source) — see ilt/SETUP.md.
  */
 window.APP_CONFIG = {
-  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbz3B7Z7UtR2NuLf2QYkT0sEn58_etUab1jc5TqETY4ZWSNw_okAN4PDBUIBlGnxRZv6/exec",
-  SHARED_SECRET: "information literacy boh podgornik",
+  ENDPOINT_URL: "https://script.google.com/macros/s/AKfycbzaHy0Dro5T_rkuJyefFQG22CdsWBo8n5i9SNm8kL5J8noJTjwCMpAUaZMWcz3dH4IY/exec",
+  SHARED_SECRET: "BOH",
 };
