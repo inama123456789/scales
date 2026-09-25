@@ -45,6 +45,18 @@
 (function () {
   const { ITEMS, TF_OPTIONS, AGREE_OPTIONS, TF_INTRO, AGREE_INTRO } = window.SCALE;
   const form = document.getElementById("surveyForm");
+
+  // Optional course-group tag from the URL (e.g. ?group=A). It labels each
+  // response and shows a badge; the dashboard can filter results by it.
+  const GROUP = (new URLSearchParams(location.search).get("group") || "").trim();
+  function withGroup(id) { return GROUP ? GROUP + " | " + id : id; }
+  if (GROUP) {
+    const badge = document.createElement("div");
+    badge.textContent = "Group: " + GROUP;
+    badge.style.cssText = "display:inline-block;margin:4px 0 12px;padding:6px 12px;border-radius:999px;background:color-mix(in srgb, var(--series-1) 15%, transparent);color:var(--text-primary);font-size:0.85rem;font-weight:600;";
+    const mainWrap = form.closest(".wrap");
+    mainWrap.querySelector("h1").insertAdjacentElement("afterend", badge);
+  }
   const answers = {};
 
   function renderTfItem(item, displayIndex) {
@@ -158,7 +170,7 @@
 
     const payload = {
       secret: window.APP_CONFIG.SHARED_SECRET,
-      respondentId: document.getElementById("respondentId").value.trim() || "anonymous",
+      respondentId: withGroup(document.getElementById("respondentId").value.trim() || "anonymous"),
       answers,
       submittedAt: new Date().toISOString(),
     };

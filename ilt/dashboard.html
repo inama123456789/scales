@@ -66,6 +66,35 @@
     return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
   }
 
+  // Course-group filtering. Responses are tagged "Group | id"; the bar lets you
+  // view one group at a time (its own "box") or all together.
+  let ALL_RESPONDENTS = [];
+  let CURRENT_GROUP = (new URLSearchParams(location.search).get("group") || "").trim() || "__all__";
+  function groupOf(r) { const id = String(r.respondentId || ""); const i = id.indexOf(" | "); return i >= 0 ? id.slice(0, i) : "(no group)"; }
+  function filteredRespondents() { return CURRENT_GROUP === "__all__" ? ALL_RESPONDENTS : ALL_RESPONDENTS.filter((r) => groupOf(r) === CURRENT_GROUP); }
+  function rerender() { render(aggregateClass(ITEMS, filteredRespondents())); }
+  function ensureGroupBar() {
+    let bar = document.getElementById("groupBar");
+    if (!bar) { bar = document.createElement("div"); bar.id = "groupBar"; bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:16px;font-size:0.85rem;"; const c = document.getElementById("content"); c.parentNode.insertBefore(bar, c); }
+    return bar;
+  }
+  function renderGroupBar() {
+    const groups = Array.from(new Set(ALL_RESPONDENTS.map(groupOf))).filter((g) => g !== "(no group)").sort();
+    const bar = ensureGroupBar();
+    if (!groups.length) { bar.style.display = "none"; return; }
+    bar.style.display = "flex";
+    bar.innerHTML = '<span style="color:var(--text-secondary)">Group:</span>';
+    [{ key: "__all__", label: "All groups" }].concat(groups.map((g) => ({ key: g, label: g }))).forEach((o) => {
+      const b = document.createElement("button");
+      b.className = "secondary";
+      const count = o.key === "__all__" ? ALL_RESPONDENTS.length : ALL_RESPONDENTS.filter((r) => groupOf(r) === o.key).length;
+      b.textContent = o.label + " (" + count + ")";
+      if (o.key === CURRENT_GROUP) { b.style.borderColor = "var(--series-1)"; b.style.fontWeight = "600"; }
+      b.addEventListener("click", () => { CURRENT_GROUP = o.key; renderGroupBar(); rerender(); });
+      bar.appendChild(b);
+    });
+  }
+
   document.getElementById("refreshBtn").addEventListener("click", load);
   load();
 
@@ -81,7 +110,9 @@
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "Request failed");
       document.getElementById("lastUpdated").textContent = "Updated " + new Date().toLocaleTimeString();
-      render(aggregateClass(ITEMS, data.respondents || []));
+      ALL_RESPONDENTS = data.respondents || [];
+      renderGroupBar();
+      rerender();
     } catch (err) {
       content.innerHTML = '<div class="empty-state">Could not load data: ' + escapeHtml(err.message) + "</div>";
     }
