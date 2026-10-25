@@ -68,7 +68,7 @@ const PSD_SCALE_INTRO =
 const PSD_BASELINES = {
   notFullyVaccinated: {
     label: "Not fully vaccinated (approximation from Figure)",
-    dims: { temporal: 4.90, social: 5.80, hypothetical: 2.40, spatial: 4.10 },
+    dims: { temporal: 3.90, social: 4.80, hypothetical: 2.40, spatial: 4.10 },
     total: 3.70,
   },
   fullyVaccinated: {
