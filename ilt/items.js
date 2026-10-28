@@ -15,9 +15,9 @@
  * see the "Shortened teaching version" block below. Score = correct / number
  * of active items (25 by default, 40 if restored).
  *
- * Baseline for comparison (see baseline.js): the published validation-sample
- * mean of 66.0% correct (N = 536 university students). This is a SEPARATE
- * instrument from the science-literacy scale — nothing is shared between them.
+ * Benchmark for comparison: the original study's POST-COURSE result, computed
+ * for the active item set (77.6% for the 25-item version, 78.6% for the full
+ * 40-item test). See the ILT_BENCHMARK_* constants below for the derivation.
  *
  * Some items refer to a shared stimulus (a catalogue record, a search-form
  * table). Those are stored in the item's `stimulus` field (HTML) and shown
@@ -535,21 +535,26 @@ function iltItemText(item, activeItems) {
   return item.text.replace("§REF§", ref);
 }
 
-// US? No — this is a Slovenian validation sample. Baseline = overall mean
-// percentage correct in the original validation study (Table 5, N = 536).
-// NOTE: this 66.0% is the mean over the FULL 40-item test, so it is only a
-// rough reference for the shortened 25-item version (the removed A1 items are
-// not subtracted out).
-const ILT_BASELINE = {
-  label: "Validation sample, full 40-item test (N = 536)",
-  meanPercent: 66.0,          // overall pretest mean, % correct (full test)
-  postTrainingPercent: 78.6,  // optional 2nd reference: after IL course
-};
+// Post-course benchmark: the original study's result AFTER an information-
+// literacy course, computed for the ACTIVE item set. This is the value the
+// dashboard compares the class against.
+//
+// Shortened 25-item version: these 25 items are exactly subscales A2-A5 of the
+// paper's grouping A. Their post-course means (Table 10) are
+//   A2 = 7.3/10, A3 = 4.6/5, A4 = 2.8/3, A5 = 4.7/7,
+// which sum to 19.4 / 25 = 77.6% correct (n = 163).
+// Full 40-item version: 31.4 / 40 = 78.6% (Table 9, n = 163).
+// (Do NOT use 78.6% / 31.4 for the 25-item comparison — those are full-test.)
+// Source: Boh Podgornik, Dolničar, Šorgo & Bartol (2016), JASIST 67(10),
+// 2420-2436, https://doi.org/10.1002/asi.23586.
+const ILT_BENCHMARK_SHORT = { percent: 77.6, score: 19.4, outOf: 25, n: 163, shortened: true };
+const ILT_BENCHMARK_FULL  = { percent: 78.6, score: 31.4, outOf: 40, n: 163, shortened: false };
+function iltBenchmark() { return USE_FULL_TEST ? ILT_BENCHMARK_FULL : ILT_BENCHMARK_SHORT; }
 
 if (typeof window !== "undefined") {
   window.ILT = {
     ITEMS: ILT_ITEMS,               // all 40 definitions (for restore)
-    BASELINE: ILT_BASELINE,
+    benchmark: iltBenchmark,        // post-course comparison value (25 or 40)
     activeItems: iltActiveItems,    // the set actually used (25 by default)
     itemText: iltItemText,          // resolves cross-item number references
     USE_FULL_TEST: USE_FULL_TEST,
@@ -558,7 +563,7 @@ if (typeof window !== "undefined") {
 }
 if (typeof module !== "undefined") {
   module.exports = {
-    ILT_ITEMS, ILT_BASELINE, iltActiveItems, iltItemText,
-    USE_FULL_TEST, ILT_A1_REMOVED_IDS,
+    ILT_ITEMS, iltBenchmark, ILT_BENCHMARK_SHORT, ILT_BENCHMARK_FULL,
+    iltActiveItems, iltItemText, USE_FULL_TEST, ILT_A1_REMOVED_IDS,
   };
 }

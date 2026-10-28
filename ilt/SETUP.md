@@ -55,13 +55,16 @@ survey (no extra setup). Once pushed, the links are:
   list in `apps-script/Code.gs`, with a fresh Sheet).
 - Each question is scored 1 (correct) / 0 (incorrect or unanswered). Total is
   0–25 (0–40 if restored); the dashboard also shows it as a percentage.
-- **Baseline** = the published validation-sample mean of **66.0% correct**
-  (N = 536; Boh Podgornik et al., 2016, Table 5). ⚠️ This mean is for the
-  **full 40-item test**, so it is only a rough reference for the shortened
-  version (the removed A1 items are not subtracted out). The dashboard also
-  draws a dashed reference line at **78.6%** (the sample's post-course mean).
-  There is no per-item published baseline, so item-level accuracy is shown for
-  your class alone.
+- **Benchmark** = the original study's **post-course** result, computed for the
+  **same active items** (Boh Podgornik et al., 2016; n = 163 students who had
+  completed an information-literacy course). For the shortened 25-item version
+  it is **77.6% correct (19.4 / 25)**, derived from the Table 10 post-course
+  subscale means A2–A5 (7.3/10 + 4.6/5 + 2.8/3 + 4.7/7 = 19.4/25). For the full
+  40-item test it is **78.6% (31.4 / 40)** (Table 9). The value lives in one
+  constant (`ILT_BENCHMARK_*` in `items.js`) and follows `USE_FULL_TEST`. A
+  short disclaimer explaining it is shown directly under the comparison on the
+  dashboard. There is no per-item published benchmark, so item-level accuracy
+  is shown for your class alone.
 
 ## Notes on specific items
 

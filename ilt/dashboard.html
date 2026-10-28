@@ -37,7 +37,7 @@
 <body>
 <div class="wrap">
   <h1>Information Literacy Test — Dashboard</h1>
-  <p class="lede">Your class's results compared with the published validation-sample baseline (Boh Podgornik et al., 2016).</p>
+  <p class="lede">Your class's results compared with the original study's post-course result (Boh Podgornik et al., 2016).</p>
 
   <div class="toolbar">
     <button class="secondary" id="refreshBtn">Refresh data</button>
@@ -56,7 +56,7 @@
 <script>
 (function () {
   const ITEMS = window.ILT.activeItems();
-  const BASELINE = window.ILT.BASELINE;
+  const BENCHMARK = window.ILT.benchmark();
   const itemText = window.ILT.itemText;
   const { aggregateClass } = window.ILT_SCORING;
 
@@ -140,7 +140,7 @@
       { label: "Respondents", value: String(agg.n) },
       { label: "Class mean score", value: meanScore.toFixed(1) + " / " + ITEMS.length },
       { label: "Class mean % correct", value: Math.round(agg.meanPercent) + "%" },
-      { label: "Baseline (" + BASELINE.label + ")", value: BASELINE.meanPercent + "%" },
+      { label: "Post-course benchmark", value: BENCHMARK.percent + "%" },
     ];
     tiles.forEach((t) => {
       const el = document.createElement("div");
@@ -151,33 +151,25 @@
     return div;
   }
 
-  // Overview: two bars (your class, baseline) with an optional dashed
-  // reference line for the post-training mean.
+  // Overview: your class vs. the post-course benchmark (same active item set).
   function renderOverviewChart(agg) {
     const card = document.createElement("div");
     card.className = "chart-card";
     const h = document.createElement("h2");
     h.style.cssText = "margin:0 0 12px;color:var(--text-primary);font-size:1.05rem;";
-    h.textContent = "Overall % correct: your class vs. baseline";
+    h.textContent = "Overall % correct: your class vs. post-course benchmark";
     card.appendChild(h);
-    if (!window.ILT.USE_FULL_TEST) {
-      const note = document.createElement("p");
-      note.style.cssText = "margin:-6px 0 12px;color:var(--text-muted);font-size:0.82rem;";
-      note.textContent = "Note: the baseline is the mean over the full 40-item test, so it is only a rough reference for this shortened 25-item version.";
-      card.appendChild(note);
-    }
 
     const legend = document.createElement("div");
     legend.className = "legend";
     legend.innerHTML =
       '<span><span class="swatch" style="background:' + COLOR_CLASS + '"></span>Your class</span>' +
-      '<span><span class="swatch" style="background:' + COLOR_BASE + '"></span>Validation sample (published)</span>' +
-      (BASELINE.postTrainingPercent ? '<span><span class="dashkey"></span>After IL course (' + BASELINE.postTrainingPercent + "%)</span>" : "");
+      '<span><span class="swatch" style="background:' + COLOR_BASE + '"></span>After IL course (benchmark)</span>';
     card.appendChild(legend);
 
     const rows = [
       { label: "Your class", value: agg.meanPercent, color: COLOR_CLASS },
-      { label: "Validation sample", value: BASELINE.meanPercent, color: COLOR_BASE },
+      { label: "After IL course", value: BENCHMARK.percent, color: COLOR_BASE },
     ];
 
     const width = 900, height = 260, mTop = 20, mBottom = 40, mLeft = 8, mRight = 8;
@@ -216,7 +208,7 @@
 
       const val = svgEl("text");
       setAttrs(val, { x: cx, y: y - 7, "text-anchor": "middle", class: "value-label" });
-      val.textContent = Math.round(row.value) + "%";
+      val.textContent = row.value.toFixed(1) + "%";
       g.appendChild(val);
 
       const lab = svgEl("text");
@@ -229,18 +221,38 @@
       svg.appendChild(g);
     });
 
-    // Dashed post-training reference line across the plot.
-    if (BASELINE.postTrainingPercent) {
-      const y = mTop + plotH * (1 - BASELINE.postTrainingPercent / 100);
-      const ref = svgEl("line");
-      setAttrs(ref, { x1: mLeft, x2: width - mRight, y1: y, y2: y, stroke: COLOR_MUTED, "stroke-width": 2, "stroke-dasharray": "5 4" });
-      svg.appendChild(ref);
-    }
-
     const holder = document.createElement("div");
     holder.appendChild(svg);
     card.appendChild(holder);
+
+    card.appendChild(renderComparisonDisclaimer());
     return card;
+  }
+
+  // Disclaimer attached directly under the comparison (visible without
+  // clicking, scrolling inside a widget, or hovering). Wording follows the
+  // active item set via the benchmark's `shortened` flag.
+  function renderComparisonDisclaimer() {
+    const p = document.createElement("p");
+    p.style.cssText = "margin:14px 0 0;padding:10px 12px;border-left:3px solid var(--series-2);background:color-mix(in srgb, var(--series-2) 7%, transparent);border-radius:6px;font-size:0.85rem;line-height:1.5;color:var(--text-secondary);";
+    const lead = "<strong style=\"color:var(--text-primary)\">About this comparison:</strong> ";
+    if (BENCHMARK.shortened) {
+      p.innerHTML = lead +
+        "The original Information Literacy Test (Boh Podgornik et al., 2016) has 40 items. " +
+        "You answered a shortened version with 25 of them. The comparison value is the " +
+        "original study's result after an information literacy course, calculated for these " +
+        "same 25 items only: 77.6% correct (about 19.4 of 25; n = 163). It was derived from " +
+        "subscale means published in the article and is accurate to about ±1 percentage point. " +
+        "The original participants were Slovenian university students tested in 2014, so use " +
+        "the comparison as a rough orientation only.";
+    } else {
+      p.innerHTML = lead +
+        "The comparison value is the original study's result after an information literacy " +
+        "course on the full 40-item Information Literacy Test (Boh Podgornik et al., 2016): " +
+        "78.6% correct (31.4 of 40; n = 163). The original participants were Slovenian " +
+        "university students tested in 2014, so use the comparison as a rough orientation only.";
+    }
+    return p;
   }
 
   function renderItemSection(agg) {
