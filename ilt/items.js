@@ -9,7 +9,11 @@
  * The 40 multiple-choice questions are reproduced from the article's
  * Appendix ("Online Information Literacy Test"), where the correct answer
  * of each item is printed in bold. Each item has exactly one correct answer
- * and is scored 1 (correct) / 0 (incorrect or unanswered). Total score 0-40.
+ * and is scored 1 (correct) / 0 (incorrect or unanswered).
+ *
+ * The app ships a SHORTENED 25-item version by default (subscale A1 removed);
+ * see the "Shortened teaching version" block below. Score = correct / number
+ * of active items (25 by default, 40 if restored).
  *
  * Baseline for comparison (see baseline.js): the published validation-sample
  * mean of 66.0% correct (N = 536 university students). This is a SEPARATE
@@ -391,7 +395,11 @@ const ILT_ITEMS = [
     // correct answer against the article's diagram before going live.
     needsReview: true,
     note: "This item originally uses diagrams (schemes). The options below describe each scheme in words.",
-    text: "Which of these schemes is the most appropriate for presenting the topics from Question 31?",
+    // Refers to the preceding item (q31) by its on-screen number. The "§REF§"
+    // token is replaced at render time with q31's current display position, so
+    // it reads correctly in both the 25-item and the full 40-item versions.
+    refNumberOf: "q31",
+    text: "Which of these schemes is the most appropriate for presenting the topics from Question §REF§?",
     options: [
       { key: "a", text: "A single chain: Textiles → Cosmetics → Nutrition → Natural dyes" },
       { key: "b", text: '"Uses of natural dyes" as the top category, branching into: Nutrition, Cosmetics, Textiles' },
@@ -490,17 +498,67 @@ const ILT_ITEMS = [
   },
 ];
 
+// ---- Shortened teaching version --------------------------------------------
+// The app ships SHORTENED: the 15 items of subscale A1 ("Determine the extent
+// of the information needed", ACRL Standard 1) are removed, leaving 25 items.
+// Each kept item keeps its ORIGINAL id (q15..q32, q34..q40) so results stay
+// traceable to the published 40-item test; students simply see them numbered
+// 1..25 in the original order.
+//
+// To restore the FULL 40-item test, set USE_FULL_TEST = true (one line). For a
+// clean 25-column data export you also re-deploy ilt/apps-script/Code.gs with a
+// fresh Sheet — see the ITEM_IDS note there.
+const USE_FULL_TEST = false;
+
+// Subscale A1 = published items 1-14 and 33. Ids equal the published numbers.
+const ILT_A1_REMOVED_IDS = [
+  "q1", "q2", "q3", "q4", "q5", "q6", "q7", "q8", "q9", "q10",
+  "q11", "q12", "q13", "q14", "q33",
+];
+
+// The item set the app actually presents and scores, in published order:
+// 25 items when shortened, all 40 when USE_FULL_TEST is true.
+function iltActiveItems() {
+  if (USE_FULL_TEST) return ILT_ITEMS.slice();
+  return ILT_ITEMS.filter((it) => ILT_A1_REMOVED_IDS.indexOf(it.id) === -1);
+}
+
+// Resolve an item's on-screen text. If the item references another item by its
+// display number (`refNumberOf` + a "§REF§" token), the token is replaced with
+// that item's 1-based position in `activeItems` (e.g. item 32 -> "Question 17"
+// in the 25-item set, "Question 31" in the full set).
+function iltItemText(item, activeItems) {
+  if (!item) return "";
+  if (!item.refNumberOf || item.text.indexOf("§REF§") === -1) return item.text;
+  const idx = (activeItems || []).findIndex((it) => it.id === item.refNumberOf);
+  const ref = idx >= 0 ? String(idx + 1) : "the previous question";
+  return item.text.replace("§REF§", ref);
+}
+
 // US? No — this is a Slovenian validation sample. Baseline = overall mean
 // percentage correct in the original validation study (Table 5, N = 536).
+// NOTE: this 66.0% is the mean over the FULL 40-item test, so it is only a
+// rough reference for the shortened 25-item version (the removed A1 items are
+// not subtracted out).
 const ILT_BASELINE = {
-  label: "Validation sample (N = 536)",
-  meanPercent: 66.0,          // overall pretest mean, % correct
+  label: "Validation sample, full 40-item test (N = 536)",
+  meanPercent: 66.0,          // overall pretest mean, % correct (full test)
   postTrainingPercent: 78.6,  // optional 2nd reference: after IL course
 };
 
 if (typeof window !== "undefined") {
-  window.ILT = { ITEMS: ILT_ITEMS, BASELINE: ILT_BASELINE };
+  window.ILT = {
+    ITEMS: ILT_ITEMS,               // all 40 definitions (for restore)
+    BASELINE: ILT_BASELINE,
+    activeItems: iltActiveItems,    // the set actually used (25 by default)
+    itemText: iltItemText,          // resolves cross-item number references
+    USE_FULL_TEST: USE_FULL_TEST,
+    A1_REMOVED_IDS: ILT_A1_REMOVED_IDS,
+  };
 }
 if (typeof module !== "undefined") {
-  module.exports = { ILT_ITEMS, ILT_BASELINE };
+  module.exports = {
+    ILT_ITEMS, ILT_BASELINE, iltActiveItems, iltItemText,
+    USE_FULL_TEST, ILT_A1_REMOVED_IDS,
+  };
 }

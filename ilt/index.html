@@ -10,16 +10,16 @@
 <div class="progress-bar">
   <div class="wrap" style="padding-top:0;padding-bottom:0;">
     <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-    <div class="progress-label" id="progressLabel">0 / 40 answered</div>
+    <div class="progress-label" id="progressLabel">0 / 25 answered</div>
   </div>
 </div>
 
 <div class="wrap">
   <h1>Information Literacy Test</h1>
   <p class="lede">
-    This test has 40 multiple-choice questions about finding, evaluating, and
+    This test has <span id="qCount">25</span> multiple-choice questions about finding, evaluating, and
     using information. Each question has exactly one correct answer. Answer as
-    best you can &mdash; there's no time limit, and it takes about 20&ndash;30 minutes.
+    best you can &mdash; there's no time limit, and it takes about 15&ndash;20 minutes.
   </p>
 
   <div class="card">
@@ -42,7 +42,8 @@
 <script src="config.js"></script>
 <script>
 (function () {
-  const { ITEMS } = window.ILT;
+  const ITEMS = window.ILT.activeItems();
+  const itemText = window.ILT.itemText;
   const form = document.getElementById("surveyForm");
 
   // Optional course-group tag from the URL (e.g. ?group=A). It labels each
@@ -73,7 +74,7 @@
       html += '<div class="stimulus">' + item.stimulus + "</div>";
     }
     html += '<div class="item-index">Question ' + displayIndex + " of " + ITEMS.length + "</div>";
-    html += '<div class="item-text">' + escapeHtml(item.text) + "</div>";
+    html += '<div class="item-text">' + escapeHtml(itemText(item, ITEMS)) + "</div>";
     if (item.note) {
       html += '<div class="item-note">' + escapeHtml(item.note) + "</div>";
     }
@@ -115,6 +116,11 @@
   }
 
   ITEMS.forEach((item, i) => form.appendChild(renderItem(item, i + 1)));
+
+  // Derive the visible counts from the active item set (25 by default).
+  const qCountEl = document.getElementById("qCount");
+  if (qCountEl) qCountEl.textContent = ITEMS.length;
+  updateProgress();
 
   document.getElementById("submitBtn").addEventListener("click", submit);
 

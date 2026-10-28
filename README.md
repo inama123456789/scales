@@ -7,7 +7,7 @@ baselines, own Google Sheets, own dashboards):
 | App | Folder | What it measures |
 |-----|--------|------------------|
 | Science Literacy Scale | repo root (`index.html`, `dashboard.html`) | 14-item digital science-literacy scale (Mede et al., 2025), vs. US population |
-| Information Literacy Test | [`ilt/`](./ilt/) | 40-item information-literacy test (Boh Podgornik et al., 2016), vs. validation-sample baseline |
+| Information Literacy Test | [`ilt/`](./ilt/) | 25-item information-literacy test (Boh Podgornik et al., 2016; shortened from 40 — subscale A1 removed), vs. validation-sample baseline |
 | Conspiracy Mentality Questionnaire | [`cmq/`](./cmq/) | 5-item CMQ (Bruder et al., 2013), vs. German/English/Turkish validation samples |
 | Psychological Distance to Science | [`psd/`](./psd/) | 16-item PSYDISC (Većkalov et al., 2024), vs. Figure-2 vaccination-status groups (approx.) |
 

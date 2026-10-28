@@ -55,7 +55,9 @@
 <script src="config.js"></script>
 <script>
 (function () {
-  const { ITEMS, BASELINE } = window.ILT;
+  const ITEMS = window.ILT.activeItems();
+  const BASELINE = window.ILT.BASELINE;
+  const itemText = window.ILT.itemText;
   const { aggregateClass } = window.ILT_SCORING;
 
   const COLOR_CLASS = cssVar("--series-1", "#2a78d6");
@@ -133,10 +135,10 @@
   function renderStatRow(agg) {
     const div = document.createElement("div");
     div.className = "stat-row";
-    const meanScore40 = (agg.meanPercent / 100 * ITEMS.length);
+    const meanScore = (agg.meanPercent / 100 * ITEMS.length);
     const tiles = [
       { label: "Respondents", value: String(agg.n) },
-      { label: "Class mean score", value: meanScore40.toFixed(1) + " / " + ITEMS.length },
+      { label: "Class mean score", value: meanScore.toFixed(1) + " / " + ITEMS.length },
       { label: "Class mean % correct", value: Math.round(agg.meanPercent) + "%" },
       { label: "Baseline (" + BASELINE.label + ")", value: BASELINE.meanPercent + "%" },
     ];
@@ -158,6 +160,12 @@
     h.style.cssText = "margin:0 0 12px;color:var(--text-primary);font-size:1.05rem;";
     h.textContent = "Overall % correct: your class vs. baseline";
     card.appendChild(h);
+    if (!window.ILT.USE_FULL_TEST) {
+      const note = document.createElement("p");
+      note.style.cssText = "margin:-6px 0 12px;color:var(--text-muted);font-size:0.82rem;";
+      note.textContent = "Note: the baseline is the mean over the full 40-item test, so it is only a rough reference for this shortened 25-item version.";
+      card.appendChild(note);
+    }
 
     const legend = document.createElement("div");
     legend.className = "legend";
@@ -257,7 +265,8 @@
       "<thead><tr><th>#</th><th>Question</th><th>Correct</th><th>% correct</th></tr></thead><tbody>" +
       stats.map((s) => {
         const meta = byId[s.id];
-        const short = meta.item.text.length > 90 ? meta.item.text.slice(0, 90) + "…" : meta.item.text;
+        const full = itemText(meta.item, ITEMS);
+        const short = full.length > 90 ? full.slice(0, 90) + "…" : full;
         return "<tr><td>" + meta.num + "</td><td>" + escapeHtml(short) +
           "</td><td class='num'>" + s.nCorrect + " / " + agg.n +
           "</td><td class='num'>" + (s.accuracy == null ? "—" : Math.round(s.accuracy * 100) + "%") + "</td></tr>";

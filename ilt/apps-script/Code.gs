@@ -11,12 +11,19 @@
 const SECRET = "information literacy boh podgornik"; // must match window.APP_CONFIG.SHARED_SECRET in ilt/config.js
 const SHEET_NAME = "Responses";
 
-// 40 item ids, in order — must match ilt/items.js (ILT_ITEMS[].id).
+// Active item ids, in published order. This is the SHORTENED 25-item set
+// (subscale A1 — items q1-q14 and q33 — removed); ids keep the original
+// published numbers so exports stay traceable to the 40-item test.
+//
+// To restore the full 40-item test: put all of q1..q40 back here AND set
+// USE_FULL_TEST = true in ilt/items.js, then re-deploy a NEW VERSION.
+// IMPORTANT: after changing this list, use a FRESH Google Sheet (or clear the
+// existing one, header included) so the new column header is written — appending
+// to an old 40-column header would misalign the data.
 const ITEM_IDS = [
-  "q1","q2","q3","q4","q5","q6","q7","q8","q9","q10",
-  "q11","q12","q13","q14","q15","q16","q17","q18","q19","q20",
-  "q21","q22","q23","q24","q25","q26","q27","q28","q29","q30",
-  "q31","q32","q33","q34","q35","q36","q37","q38","q39","q40",
+  "q15","q16","q17","q18","q19","q20","q21","q22","q23","q24",
+  "q25","q26","q27","q28","q29","q30","q31","q32","q34","q35",
+  "q36","q37","q38","q39","q40",
 ];
 
 function doPost(e) {

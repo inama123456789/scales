@@ -3,7 +3,8 @@
  *
  * Each item is single-correct multiple choice. A respondent's answer for an
  * item is the option key ("a".."d") or empty. Score = 1 if it matches the
- * item's `correct` key, else 0 (wrong OR unanswered). Total = 0..40.
+ * item's `correct` key, else 0 (wrong OR unanswered). Total = number of active
+ * items (25 in the shortened version, 40 if restored).
  *
  * Class comparison is against the published validation-sample mean percent
  * correct (ILT_BASELINE.meanPercent), so we work in percent throughout.
@@ -14,7 +15,8 @@ function isItemCorrect(item, answer) {
 }
 
 // Score one respondent: number correct, total answered, and percent (of all
-// 40 items — unanswered counts as wrong, matching a test-score interpretation).
+// active items passed in — unanswered counts as wrong, matching a test-score
+// interpretation).
 function scoreRespondent(items, answers) {
   let correct = 0;
   let answered = 0;
